@@ -1,0 +1,153 @@
+mock_provider "google" {}
+
+run "validate_bucket_name" {
+  variables {
+    bucket_name = "mock-bucket"
+  }
+
+  assert {
+    condition     = google_storage_bucket.my_bucket.name == "mock-bucket"
+    error_message = "Bucket name does not match expected value"
+  }
+}
+variables {
+  bucket_name = "my-test-bucket"
+  files = {
+    "file-one.txt" = "data/files/file_one.txt"
+    "file-two.txt" = "data/files/file_two.txt"
+  }
+}
+
+provider "google" {
+  project = "my-gcp-project"
+  region  = "us-central1"
+}
+
+run "setup" {
+  # Create the GCP storage bucket using the setup module.
+  module {
+    source = "./testing/setup"
+  }
+}
+
+run "execute" {
+  # Execute the main configuration, uploading files to the bucket.
+}
+
+run "verify" {
+  # Use the loading module to validate the uploaded files.
+  module {
+    source = "./testing/loader"
+  }
+
+  assert {
+    condition     = length(data.google_storage_object.objects) == 2
+    error_message = "Incorrect number of objects uploaded to the bucket"
+  }
+}
+provider "google" {
+  alias  = "default"
+  region = "us-central1"
+}
+
+provider "google" {
+  alias  = "secondary"
+  region = "europe-west1"
+}
+
+run "default_region_network" {
+  command = plan
+  providers = {
+    google = google.default
+  }
+
+  # Assertions...
+}
+
+run "secondary_region_network" {
+  command = plan
+  providers = {
+    google = google.secondary
+  }
+
+  # Assertions...
+}
+
+provider "google" {}
+
+mock_provider "google" {
+  alias = "fake"
+}
+
+run "use_real_provider" {
+  providers = {
+    google = google
+  }
+}
+
+run "use_mocked_provider" {
+  providers = {
+    google = google.fake
+  }
+}
+
+terraform {
+  required_providers {
+    google = {
+      source = "hashicorp/google"
+    }
+  }
+}
+
+variable "bucket_name" {
+  type = string
+}
+
+resource "google_storage_bucket" "my_bucket" {
+  name = var.bucket_name
+}
+
+variable "bucket_name" {
+  type = string
+}
+
+variable "files" {
+  type = map(string)
+}
+
+resource "google_storage_bucket_object" "objects" {
+  for_each = var.files
+  bucket   = var.bucket_name
+  name     = each.key
+  source   = each.value
+}
+
+variable "bucket_name" {
+  type = string
+}
+
+resource "google_storage_bucket" "bucket" {
+  name     = var.bucket_name
+  location = "US"
+}
+
+variable "bucket_name" {
+  type = string
+}
+
+data "google_storage_object" "objects" {
+  bucket = var.bucket_name
+}
+
+provider "google" {
+  region  = "us-central1"
+  project = var.gcp_project
+}
+
+run "setup" {
+  command = plan
+  variables {
+    gcp_project = "dynamic-project-setup"
+  }
+  # Further configuration...
+}
